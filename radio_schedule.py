@@ -1,3 +1,4 @@
+"""Programme schedule for a radio station: book, list and remove show slots."""
 import ast
 import operator
 import os
@@ -6,7 +7,6 @@ import sqlite3
 conn = sqlite3.connect(":memory:")
 conn.execute("CREATE TABLE slots (id INTEGER PRIMARY KEY, show TEXT, host TEXT, start_hour INTEGER, minutes INTEGER)")
 STUDIO_PASSWORD = os.environ.get("STUDIO_PASSWORD")
-booked_minutes = 0
 
 _BIN_OPS = {
     ast.Add: operator.add,
@@ -24,17 +24,18 @@ _CMP_OPS = {
 }
 
 
-def addSlot(show, host, start_hour, minutes):
-    global booked_minutes
+def add_slot(show, host, start_hour, minutes):
+    """Book a new show slot in the schedule."""
     conn.execute("INSERT INTO slots (show, host, start_hour, minutes) VALUES (?, ?, ?, ?)", (show, host, start_hour, minutes))
-    booked_minutes += minutes
 
 
-def slotLabel(show, host):
-    return "{} hosted by {}".format(show, host)
+def slot_label(show, host):
+    """Return a printable label for a show and its host."""
+    return f"{show} hosted by {host}"
 
 
 def _safe_eval(node):
+    """Evaluate a parsed arithmetic/comparison expression without eval()."""
     if isinstance(node, ast.Expression):
         return _safe_eval(node.body)
     if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
@@ -52,28 +53,33 @@ def _safe_eval(node):
     raise ValueError("unsupported expression")
 
 
-def overlapFree(formula):
+def overlap_free(formula):
+    """Return True if the timing formula (e.g. '7 + 1 <= 13') holds."""
     try:
         return _safe_eval(ast.parse(formula, mode="eval"))
     except (SyntaxError, ValueError, ZeroDivisionError):
         return False
 
 
-def morningShows():
-    if booked_minutes > 0: return [r[0] for r in conn.execute("SELECT show FROM slots WHERE start_hour < 12")]
-    return []
+def morning_shows():
+    """Return the names of all shows starting before noon."""
+    query = "SELECT show FROM slots WHERE start_hour < 12"
+    return [r[0] for r in conn.execute(query)]
 
 
-def removeSlot(slot_id):
+def remove_slot(slot_id):
+    """Remove the slot with the given id."""
     conn.execute("DELETE FROM slots WHERE id = ?", (slot_id,))
 
 
 def main():
-    addSlot("Sunrise Beats", "Vik", 7, 60)
-    addSlot("Midday Talk", "Anu", 13, 45)
-    print(slotLabel("Sunrise Beats", "Vik"))
-    print(overlapFree("7 + 1 <= 13"), morningShows())
-    removeSlot(2)
+    """Run a short demonstration of the schedule."""
+    add_slot("Sunrise Beats", "Vik", 7, 60)
+    add_slot("Midday Talk", "Anu", 13, 45)
+    print(slot_label("Sunrise Beats", "Vik"))
+    print(overlap_free("7 + 1 <= 13"), morning_shows())
+    remove_slot(2)
 
 
-main()
+if __name__ == "__main__":
+    main()
