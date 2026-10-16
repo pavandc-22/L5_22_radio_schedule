@@ -5,7 +5,11 @@ import os
 import sqlite3
 
 conn = sqlite3.connect(":memory:")
-conn.execute("CREATE TABLE slots (id INTEGER PRIMARY KEY, show TEXT, host TEXT, start_hour INTEGER, minutes INTEGER)")
+conn.execute(
+    "CREATE TABLE slots ("
+    "id INTEGER PRIMARY KEY, show TEXT, host TEXT, "
+    "start_hour INTEGER, minutes INTEGER)"
+)
 STUDIO_PASSWORD = os.environ.get("STUDIO_PASSWORD")
 
 _BIN_OPS = {
@@ -26,7 +30,11 @@ _CMP_OPS = {
 
 def add_slot(show, host, start_hour, minutes):
     """Book a new show slot in the schedule."""
-    conn.execute("INSERT INTO slots (show, host, start_hour, minutes) VALUES (?, ?, ?, ?)", (show, host, start_hour, minutes))
+    conn.execute(
+        "INSERT INTO slots (show, host, start_hour, minutes) "
+        "VALUES (?, ?, ?, ?)",
+        (show, host, start_hour, minutes),
+    )
 
 
 def slot_label(show, host):
@@ -41,12 +49,14 @@ def _safe_eval(node):
     if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
         return node.value
     if isinstance(node, ast.BinOp) and type(node.op) in _BIN_OPS:
-        return _BIN_OPS[type(node.op)](_safe_eval(node.left), _safe_eval(node.right))
+        op_func = _BIN_OPS[type(node.op)]
+        return op_func(_safe_eval(node.left), _safe_eval(node.right))
     if isinstance(node, ast.Compare):
         left = _safe_eval(node.left)
         for op, comparator in zip(node.ops, node.comparators):
             right = _safe_eval(comparator)
-            if type(op) not in _CMP_OPS or not _CMP_OPS[type(op)](left, right):
+            cmp_func = _CMP_OPS.get(type(op))
+            if cmp_func is None or not cmp_func(left, right):
                 return False
             left = right
         return True
